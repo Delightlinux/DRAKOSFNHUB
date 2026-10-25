@@ -2,6 +2,7 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ContextActionService = game:GetService("ContextActionService")
 local UserInputService = game:GetService("UserInputService")
+local Lighting = game:GetService("Lighting")
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
@@ -10,6 +11,7 @@ local Camera = workspace.CurrentCamera
 local FLY_SPEED = 50
 local FLY_ACTION_NAME = "AdminFlyMovement"
 local isFlying = false
+local cameraPitchMode = false -- Toggle for looking up/down flight
 local moveDirection = Vector3.zero
 local bodyVelocity = nil
 local bodyGyro = nil
@@ -86,11 +88,21 @@ local function setFlyEnabled(enabled: boolean)
 			local upDown = keyStates.Up - keyStates.Down
 
 			if forwardBack ~= 0 or leftRight ~= 0 or upDown ~= 0 then
-				moveVec = (camCF.RightVector * leftRight) + (Vector3.yAxis * upDown) + (camCF.LookVector * forwardBack)
+				if cameraPitchMode then
+					moveVec = (camCF.RightVector * leftRight) + (camCF.LookVector * forwardBack) + (Vector3.yAxis * upDown)
+				else
+					moveVec = (camCF.RightVector * leftRight) + (Vector3.yAxis * upDown) + (camCF.LookVector * Vector3.new(forwardBack, 0, forwardBack))
+				end
 			else
 				local charHumanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
 				if charHumanoid and charHumanoid.MoveDirection.Magnitude > 0 then
-					moveVec = Vector3.new(charHumanoid.MoveDirection.X, upDown, charHumanoid.MoveDirection.Z)
+					local md = charHumanoid.MoveDirection
+					if cameraPitchMode then
+						-- Full 3D camera vector alignment for mobile joystick
+						moveVec = (camCF.RightVector * md.X) + (camCF.LookVector * md.Z) + (Vector3.yAxis * upDown)
+					else
+						moveVec = Vector3.new(md.X, upDown, md.Z)
+					end
 				end
 			end
 
@@ -139,32 +151,68 @@ local function setNoclipEnabled(enabled: boolean)
 	end
 end
 
--- // RAINBOW COLOR LOGIC //
-local rainbowConnection = nil
-local function setRainbowEnabled(enabled: boolean)
+-- // EXTRA MOVEMENT FEATURES //
+local infJumpConnection = nil
+local function setInfiniteJump(enabled: boolean)
 	if enabled then
-		rainbowConnection = RunService.RenderStepped:Connect(function()
+		infJumpConnection = UserInputService.JumpRequest:Connect(function()
 			local character = LocalPlayer.Character
-			if character then
-				-- Changes color every 2 seconds using math.floor(tick() / 2)
-				local hue = (math.floor(tick() / 2) % 6) / 6
-				local color = Color3.fromHSV(hue, 1, 1)
-				for _, part in ipairs(character:GetDescendants()) do
-					if part:IsA("BasePart") then
-						part.Color = color
-					end
-				end
+			local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+			if humanoid then
+				humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
 			end
 		end)
 	else
-		if rainbowConnection then
-			rainbowConnection:Disconnect()
-			rainbowConnection = nil
+		if infJumpConnection then
+			infJumpConnection:Disconnect()
+			infJumpConnection = nil
 		end
 	end
 end
 
--- // UI SETUP (Rayfield with Key System) //
+local function setWalkSpeed(speed: number)
+	local character = LocalPlayer.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		humanoid.WalkSpeed = speed
+	end
+end
+
+-- // PARTY MODE (Map Color Rave every 0.1s) //
+local partyTask = nil
+local function setPartyModeEnabled(enabled: boolean)
+	if enabled then
+		partyTask = task.spawn(function()
+			while true do
+				for _, part in ipairs(workspace:GetDescendants()) do
+					if part:IsA("BasePart") and not (LocalPlayer.Character and part:IsDescendantOf(LocalPlayer.Character)) then
+						part.Color = Color3.fromRGB(math.random(0, 255), math.random(0, 255), math.random(0, 255))
+					end
+				end
+				task.wait(0.1)
+			end
+		end)
+	else
+		if partyTask then
+			task.cancel(partyTask)
+			partyTask = nil
+		end
+	end
+end
+
+-- // FULLBRIGHT //
+local function setFullbright(enabled: boolean)
+	if enabled then
+		Lighting.Brightness = 2
+		Lighting.ClockTime = 14
+		Lighting.GlobalShadows = false
+		Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
+	else
+		Lighting.GlobalShadows = true
+	end
+end
+
+-- // UI SETUP (Rayfield with Key System & Links) //
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
@@ -174,21 +222,21 @@ local Window = Rayfield:CreateWindow({
    ConfigurationSaving = {
       Enabled = false,
    },
-   KeySystem = true, -- Enables the key system popup
+   KeySystem = true, 
    KeySettings = {
       Title = "Asym Admin Key",
-      Subtitle = "Key System",
-      Note = "The key is: cheezeborger",
+      Subtitle = "Authentication Required",
+      Note = "Please enter your generated access key.",
       FileName = "AsymKey",
       SaveKey = true,
-      GrabKeyFromLink = false,
-      Key = {"cheezeborger"}
+      GrabKeyFromLink = true,
+      Key = {"https://raw.githubusercontent.com/Delightlinux/DRAKOSFNHUB/refs/heads/main/key.txt"}
    }
 })
 
 -- Movement Tab
 local MovementTab = Window:CreateTab("Movement", 4483362458)
-MovementTab:CreateSection("Flight & Noclip")
+MovementTab:CreateSection("Flight & Physics")
 
 MovementTab:CreateToggle({
    Name = "Enable Flight",
@@ -196,6 +244,15 @@ MovementTab:CreateToggle({
    Flag = "FlightToggle", 
    Callback = function(Value)
       setFlyEnabled(Value)
+   end,
+})
+
+MovementTab:CreateToggle({
+   Name = "Camera Pitch Fly (Look Up/Down)",
+   CurrentValue = false,
+   Flag = "PitchModeToggle",
+   Callback = function(Value)
+      cameraPitchMode = Value
    end,
 })
 
@@ -208,6 +265,15 @@ MovementTab:CreateToggle({
    end,
 })
 
+MovementTab:CreateToggle({
+   Name = "Infinite Jump",
+   CurrentValue = false,
+   Flag = "InfJumpToggle",
+   Callback = function(Value)
+      setInfiniteJump(Value)
+   end,
+})
+
 MovementTab:CreateInput({
    Name = "Set Flight Speed",
    PlaceholderText = "50",
@@ -216,21 +282,41 @@ MovementTab:CreateInput({
       local num = tonumber(Text)
       if num then
          FLY_SPEED = num
-         print("Flight speed updated to:", FLY_SPEED)
       end
    end,
 })
 
--- Visuals Tab
+MovementTab:CreateInput({
+   Name = "Set WalkSpeed",
+   PlaceholderText = "16",
+   RemoveTextAfterFocusLost = false,
+   Callback = function(Text)
+      local num = tonumber(Text)
+      if num then
+         setWalkSpeed(num)
+      end
+   end,
+})
+
+-- Visuals / Fun Tab
 local VisualsTab = Window:CreateTab("Visuals", 4483362458)
-VisualsTab:CreateSection("Fun Effects")
+VisualsTab:CreateSection("World Effects")
 
 VisualsTab:CreateToggle({
-   Name = "Rainbow Character (Changes every 2s)",
+   Name = "Party Mode (Map Rave every 0.1s)",
    CurrentValue = false,
-   Flag = "RainbowToggle",
+   Flag = "PartyToggle",
    Callback = function(Value)
-      setRainbowEnabled(Value)
+      setPartyModeEnabled(Value)
+   end,
+})
+
+VisualsTab:CreateToggle({
+   Name = "Fullbright",
+   CurrentValue = false,
+   Flag = "FullbrightToggle",
+   Callback = function(Value)
+      setFullbright(Value)
    end,
 })
 
