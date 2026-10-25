@@ -24,28 +24,6 @@ local keyStates = {
 	Down = 0,      -- Q
 }
 
-local function updateMovementVector()
-	local forwardBack = keyStates.Forward - keyStates.Backward
-	local leftRight = keyStates.Right - keyStates.Left
-	local upDown = keyStates.Up - keyStates.Down
-
-	local keyDir = Vector3.new(leftRight, upDown, -forwardBack)
-	local mobileDir = Vector3.zero
-	
-	local character = LocalPlayer.Character
-	if character and character:FindFirstChildOfClass("Humanoid") then
-		mobileDir = character:FindFirstChildOfClass("Humanoid").MoveDirection
-	end
-
-	if keyDir.Magnitude > 0 then
-		moveDirection = keyDir.Unit
-	elseif mobileDir.Magnitude > 0 then
-		moveDirection = Vector3.new(mobileDir.X, upDown, mobileDir.Z)
-	else
-		moveDirection = Vector3.zero
-	end
-end
-
 local function handleFlightInput(actionName, inputState, inputObject)
 	local isPressed = (inputState == Enum.UserInputState.Begin) and 1 or 0
 
@@ -63,7 +41,6 @@ local function handleFlightInput(actionName, inputState, inputObject)
 		keyStates.Down = isPressed
 	end
 
-	updateMovementVector()
 	return Enum.ContextActionResult.Pass
 end
 
@@ -100,16 +77,29 @@ local function setFlyEnabled(enabled: boolean)
 
 		flyConnection = RunService.RenderStepped:Connect(function()
 			if not isFlying or not rootPart then return end
-			if UserInputService.TouchEnabled then
-				updateMovementVector()
-			end
 
 			local camCF = Camera.CFrame
-			local flyVector = (camCF.RightVector * moveDirection.X) 
-				+ (Vector3.yAxis * moveDirection.Y) 
-				+ (camCF.LookVector * -moveDirection.Z)
+			local moveVec = Vector3.zero
 
-			bodyVelocity.Velocity = flyVector * FLY_SPEED
+			local forwardBack = keyStates.Forward - keyStates.Backward
+			local leftRight = keyStates.Right - keyStates.Left
+			local upDown = keyStates.Up - keyStates.Down
+
+			if forwardBack ~= 0 or leftRight ~= 0 or upDown ~= 0 then
+				moveVec = (camCF.RightVector * leftRight) + (Vector3.yAxis * upDown) + (camCF.LookVector * forwardBack)
+			else
+				local charHumanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+				if charHumanoid and charHumanoid.MoveDirection.Magnitude > 0 then
+					moveVec = Vector3.new(charHumanoid.MoveDirection.X, upDown, charHumanoid.MoveDirection.Z)
+				end
+			end
+
+			if moveVec.Magnitude > 0 then
+				bodyVelocity.Velocity = moveVec.Unit * FLY_SPEED
+			else
+				bodyVelocity.Velocity = Vector3.zero
+			end
+
 			bodyGyro.CFrame = camCF
 		end)
 	elseif not enabled and isFlying then
@@ -149,7 +139,32 @@ local function setNoclipEnabled(enabled: boolean)
 	end
 end
 
--- // LOAD EXISTING UI LIBRARY (Rayfield) //
+-- // RAINBOW COLOR LOGIC //
+local rainbowConnection = nil
+local function setRainbowEnabled(enabled: boolean)
+	if enabled then
+		rainbowConnection = RunService.RenderStepped:Connect(function()
+			local character = LocalPlayer.Character
+			if character then
+				-- Changes color every 2 seconds using math.floor(tick() / 2)
+				local hue = (math.floor(tick() / 2) % 6) / 6
+				local color = Color3.fromHSV(hue, 1, 1)
+				for _, part in ipairs(character:GetDescendants()) do
+					if part:IsA("BasePart") then
+						part.Color = color
+					end
+				end
+			end
+		end)
+	else
+		if rainbowConnection then
+			rainbowConnection:Disconnect()
+			rainbowConnection = nil
+		end
+	end
+end
+
+-- // UI SETUP (Rayfield with Key System) //
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
@@ -159,14 +174,23 @@ local Window = Rayfield:CreateWindow({
    ConfigurationSaving = {
       Enabled = false,
    },
-   KeySystem = false,
+   KeySystem = true, -- Enables the key system popup
+   KeySettings = {
+      Title = "Asym Admin Key",
+      Subtitle = "Key System",
+      Note = "The key is: cheezeborger",
+      FileName = "AsymKey",
+      SaveKey = true,
+      GrabKeyFromLink = false,
+      Key = {"cheezeborger"}
+   }
 })
 
-local Tab = Window:CreateTab("Movement", 4483362458) -- Title, Icon ID
+-- Movement Tab
+local MovementTab = Window:CreateTab("Movement", 4483362458)
+MovementTab:CreateSection("Flight & Noclip")
 
-Tab:CreateSection("Flight & Noclip")
-
-Tab:CreateToggle({
+MovementTab:CreateToggle({
    Name = "Enable Flight",
    CurrentValue = false,
    Flag = "FlightToggle", 
@@ -175,7 +199,7 @@ Tab:CreateToggle({
    end,
 })
 
-Tab:CreateToggle({
+MovementTab:CreateToggle({
    Name = "Enable Noclip",
    CurrentValue = false,
    Flag = "NoclipToggle",
@@ -184,7 +208,7 @@ Tab:CreateToggle({
    end,
 })
 
-Tab:CreateInput({
+MovementTab:CreateInput({
    Name = "Set Flight Speed",
    PlaceholderText = "50",
    RemoveTextAfterFocusLost = false,
@@ -194,6 +218,19 @@ Tab:CreateInput({
          FLY_SPEED = num
          print("Flight speed updated to:", FLY_SPEED)
       end
+   end,
+})
+
+-- Visuals Tab
+local VisualsTab = Window:CreateTab("Visuals", 4483362458)
+VisualsTab:CreateSection("Fun Effects")
+
+VisualsTab:CreateToggle({
+   Name = "Rainbow Character (Changes every 2s)",
+   CurrentValue = false,
+   Flag = "RainbowToggle",
+   Callback = function(Value)
+      setRainbowEnabled(Value)
    end,
 })
 
