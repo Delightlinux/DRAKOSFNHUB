@@ -98,7 +98,6 @@ local function setFlyEnabled(enabled: boolean)
 				if charHumanoid and charHumanoid.MoveDirection.Magnitude > 0 then
 					local md = charHumanoid.MoveDirection
 					if cameraPitchMode then
-						-- Full 3D camera vector alignment for mobile joystick
 						moveVec = (camCF.RightVector * md.X) + (camCF.LookVector * md.Z) + (Vector3.yAxis * upDown)
 					else
 						moveVec = Vector3.new(md.X, upDown, md.Z)
@@ -212,7 +211,7 @@ local function setFullbright(enabled: boolean)
 	end
 end
 
--- // UI SETUP (Rayfield with Key System & Links) //
+-- // UI SETUP (Rayfield with Explicit Key Display) //
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
@@ -225,12 +224,12 @@ local Window = Rayfield:CreateWindow({
    KeySystem = true, 
    KeySettings = {
       Title = "Asym Admin Key",
-      Subtitle = "Authentication Required",
-      Note = "Please enter your generated access key.",
+      Subtitle = "Key System",
+      Note = "The key is: cheezeborger",
       FileName = "AsymKey",
       SaveKey = true,
-      GrabKeyFromLink = true,
-      Key = {"https://raw.githubusercontent.com/Delightlinux/DRAKOSFNHUB/refs/heads/main/key.txt"}
+      GrabKeyFromLink = false,
+      Key = {"cheezeborger"}
    }
 })
 
