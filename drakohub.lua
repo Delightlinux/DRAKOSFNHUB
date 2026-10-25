@@ -149,28 +149,52 @@ local function setNoclipEnabled(enabled: boolean)
 	end
 end
 
--- // APPLE UI SETUP //
-local library = loadstring(game:HttpGet("https://github.com/GoHamza/AppleLibrary/blob/main/main.lua?raw=true"))()
-local window = library:init("Asym Admin Panel", true, Enum.KeyCode.RightShift, true)
+-- // LOAD EXISTING UI LIBRARY (Rayfield) //
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
-window:Divider("Admin Movement Controls")
+local Window = Rayfield:CreateWindow({
+   Name = "Asym Admin Panel",
+   LoadingTitle = "Asym Interface",
+   LoadingSubtitle = "by Delightlinux",
+   ConfigurationSaving = {
+      Enabled = false,
+   },
+   KeySystem = false,
+})
 
-local movementSection = window:Section("Flight & Noclip")
+local Tab = Window:CreateTab("Movement", 4483362458) -- Title, Icon ID
 
-movementSection:Switch("Enable Flight", false, function(state)
-	setFlyEnabled(state)
-end)
+Tab:CreateSection("Flight & Noclip")
 
-movementSection:Switch("Enable Noclip", false, function(state)
-	setNoclipEnabled(state)
-end)
+Tab:CreateToggle({
+   Name = "Enable Flight",
+   CurrentValue = false,
+   Flag = "FlightToggle", 
+   Callback = function(Value)
+      setFlyEnabled(Value)
+   end,
+})
 
-movementSection:TextField("Set Speed (e.g. 50)", "50", function(text)
-	local num = tonumber(text)
-	if num then
-		FLY_SPEED = num
-		print("Flight speed updated to:", FLY_SPEED)
-	end
-end)
+Tab:CreateToggle({
+   Name = "Enable Noclip",
+   CurrentValue = false,
+   Flag = "NoclipToggle",
+   Callback = function(Value)
+      setNoclipEnabled(Value)
+   end,
+})
 
-movementSection:Select()
+Tab:CreateInput({
+   Name = "Set Flight Speed",
+   PlaceholderText = "50",
+   RemoveTextAfterFocusLost = false,
+   Callback = function(Text)
+      local num = tonumber(Text)
+      if num then
+         FLY_SPEED = num
+         print("Flight speed updated to:", FLY_SPEED)
+      end
+   end,
+})
+
+Rayfield:LoadConfiguration()
